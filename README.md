@@ -29,13 +29,14 @@ To reproduce the experiments:
 
 data/
 ├── images/
-│ ├── image_1.h5
-│ ├── image_2.h5
-│ └── ...
+│   ├── image_1.h5
+│   ├── image_2.h5
+│   └── ...
 └── masks/
-├── mask_1.h5
-├── mask_2.h5
-└── ...
+    ├── mask_1.h5
+    ├── mask_2.h5
+    └── ...
+
 
 3. Use the provided training and evaluation scripts.
 
