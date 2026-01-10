@@ -1,0 +1,11 @@
+{
+    "model": "U-Net",
+    "dataset": "Landslide4Sense",
+    "input_shape": [
+        128,
+        128,
+        14
+    ],
+    "best_threshold": 0.4,
+    "task": "binary semantic segmentation"
+}
