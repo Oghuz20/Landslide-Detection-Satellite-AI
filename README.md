@@ -26,7 +26,7 @@ The Landslide4Sense dataset is **not included** in this repository due to its si
 To reproduce the experiments:
 1. Download the Landslide4Sense dataset from its official source.
 2. Organize the data using the following structure:
-
+```
 data/
 ├── images/
 │   ├── image_1.h5
@@ -36,8 +36,7 @@ data/
     ├── mask_1.h5
     ├── mask_2.h5
     └── ...
-
-
+```
 3. Use the provided training and evaluation scripts.
 
 All preprocessing, training, and evaluation steps are fully implemented in this repository.
