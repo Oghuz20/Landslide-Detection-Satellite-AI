@@ -1,0 +1,78 @@
+# ============================================================================
+# Landslide Detection Project - Python Dependencies
+# ============================================================================
+# Python 3.12 (tested)
+# Install: pip install -r requirements.txt --break-system-packages
+# ============================================================================
+
+# ============================================================================
+# DEEP LEARNING FRAMEWORK
+# ============================================================================
+torch==2.7.1
+torchvision==0.20.1
+
+# ============================================================================
+# DATA PROCESSING
+# ============================================================================
+numpy==2.2.1
+h5py==3.12.1
+albumentations==1.4.23
+opencv-python==4.10.0.84
+
+# ============================================================================
+# MACHINE LEARNING
+# ============================================================================
+scikit-learn==1.6.1
+scipy==1.14.1
+
+# ============================================================================
+# VISUALIZATION
+# ============================================================================
+matplotlib==3.9.3
+seaborn==0.13.2
+plotly==5.24.1
+Pillow==11.0.0
+
+# ============================================================================
+# PROGRESS BARS
+# ============================================================================
+tqdm==4.67.1
+
+# ============================================================================
+# NOTEBOOK SUPPORT (Optional - for Colab)
+# ============================================================================
+jupyter==1.1.1
+ipykernel==6.29.5
+ipywidgets==8.1.5
+
+# ============================================================================
+# EXPERIMENT TRACKING (Optional)
+# ============================================================================
+# tensorboard==2.18.0
+# wandb==0.18.7
+
+# ============================================================================
+# UTILITIES
+# ============================================================================
+pyyaml==6.0.2
+tqdm==4.67.1
+
+# ============================================================================
+# NOTES
+# ============================================================================
+# GPU Support:
+#   - CUDA 11.8 is recommended
+#   - For CPU-only: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#   - For GPU: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+#
+# Installation on Windows:
+#   powershell -ExecutionPolicy Bypass -File venv_landslide\Scripts\Activate.ps1
+#   pip install -r requirements.txt --break-system-packages
+#
+# Installation on Linux/Mac:
+#   source venv/bin/activate
+#   pip install -r requirements.txt
+#
+# Google Colab:
+#   Already has most packages installed
+#   May only need: !pip install albumentations h5py
