@@ -408,10 +408,6 @@ Landslide-Detection-Satellite-AI/
 ├── 📁 notebooks/                # Jupyter notebooks
 │   └── train_colab.ipynb        # Google Colab training notebook
 │
-├── 📁 scripts/                  # Utility scripts
-│   ├── cleanup_old_files.ps1    # Remove old files
-│   └── reorganize_structure.ps1 # Restructure project
-│
 ├── ensemble_predict.py          # Main inference script
 ├── requirements.txt             # Python dependencies
 ├── .gitignore                   # Git ignore rules
