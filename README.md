@@ -165,17 +165,57 @@ This combination effectively handles the extreme class imbalance.
 ✅ **State-of-the-Art Architecture**: Attention mechanisms for better feature learning  
 ✅ **Robust Prediction**: Ensemble of 3 checkpoints for stable results  
 
-### Visualizations
+## 📸 Visualizations
 
-Example predictions showing:
-- Original satellite imagery (RGB composite)
-- Ground truth landslide masks
-- Model predictions
-- Error analysis (True Positives, False Positives, False Negatives)
+### Performance Distribution
 
-![Prediction Examples](visualizations/confusion_matrix_grid.png)
+![Performance Distribution](visualizations/performance_distribution.png)
 
-More visualizations available in [`visualizations/`](visualizations/)
+**Key Insights:**
+- Mean F1: 0.596 (median: 0.612)
+- 54% of images achieve F1 ≥ 0.6
+- 14% achieve excellent F1 ≥ 0.8
+- Performance varies by landslide size and terrain complexity
+
+### Example Predictions
+
+#### ✅ Successful Detection (F1 > 0.90)
+
+| Image 152 (F1: 0.926) | Image 432 (F1: 0.924) |
+|:---------------------:|:---------------------:|
+| ![](visualizations/prediction_image_152.png) | ![](visualizations/prediction_image_432.png) |
+
+**Success factors:**
+- Large, clearly defined landslides
+- High spectral contrast with background
+- Minimal vegetation cover
+- Simple terrain
+
+#### ⚠️ Challenging Cases (F1 = 0)
+
+| Image 100 | Image 101 |
+|:---------:|:---------:|
+| ![](visualizations/prediction_image_100.png) | ![](visualizations/prediction_image_101.png) |
+
+**Note:** F1 = 0 indicates **no landslides present** in ground truth (true negatives).  
+These are not model failures - the model correctly predicted background.
+
+#### 📊 Confusion Matrix Examples
+
+![Confusion Matrix Grid](visualizations/confusion_matrix_grid.png)
+
+**Color coding:**
+- 🟢 Green: Ground truth landslides
+- 🔴 Red: Model predictions
+- Overlap areas: True positives (correct detections)
+
+**Categories:**
+- **TP (True Positive)**: Correct landslide detection
+- **FP (False Positive)**: False alarm (predicted landslide where none exists)
+- **FN (False Negative)**: Missed landslide
+- **TN (True Negative)**: Correct background prediction
+
+For more visualizations, see the [`visualizations/`](visualizations/) directory.
 
 ---
 
