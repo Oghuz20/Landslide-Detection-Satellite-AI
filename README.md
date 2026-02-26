@@ -2,180 +2,173 @@
 
 > **Automated landslide detection using deep learning and multi-spectral satellite imagery**
 
-[![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.7.1-red.svg)](https://pytorch.org/)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-![Landslide Detection Example](docs/images/example_prediction.png)
+---
 
 ## 📋 Table of Contents
 
 - [Overview](#-overview)
 - [Key Features](#-key-features)
+- [Results](#-results)
 - [Dataset](#-dataset)
 - [Model Architecture](#-model-architecture)
-- [Results](#-results)
 - [Installation](#-installation)
 - [Usage](#-usage)
 - [Project Structure](#-project-structure)
 - [Documentation](#-documentation)
+- [Academic Context](#-academic-context)
 - [Citation](#-citation)
-- [License](#-license)
 
 ---
 
 ## 🎯 Overview
 
-This project implements an **Attention U-Net** deep learning model for automatic landslide detection from satellite imagery. The model processes multi-spectral satellite data (Sentinel-2) combined with topographic features (DEM, slope) to identify landslide-affected areas.
+This project implements a **UNet++ with EfficientNet-b5 encoder** for automatic landslide
+detection from satellite imagery. The model processes 14-channel multi-spectral data
+(Sentinel-2 + slope + DEM) to produce binary pixel-level landslide segmentation masks.
+
+Trained on the **Landslide4Sense** benchmark dataset using a two-phase strategy:
+Phase 1 on TrainData with early stopping, Phase 2 on Train+Valid combined for maximum
+use of labeled data.
 
 ### Why This Matters
 
-- 🌍 **Early Detection**: Enables rapid identification of landslides across large geographic areas
-- 💰 **Cost-Effective**: Automates manual analysis, reducing time and resources
-- 🛰️ **Wide Coverage**: Processes satellite data covering vast, inaccessible regions
-- 🚨 **Life-Saving**: Early warnings can prevent casualties and property damage
+- 🌍 **Early Detection** — rapid identification of landslides across large geographic areas
+- 🛰️ **Wide Coverage** — processes satellite data covering vast, inaccessible regions
+- 💰 **Cost-Effective** — automates manual expert analysis
+- 🚨 **Life-Saving** — early warnings can prevent casualties and property damage
 
-### Challenge
+### Challenges Addressed
 
-Landslide detection faces several unique challenges:
-
-1. **Extreme Class Imbalance**: Only ~1.9% of pixels represent landslides
-2. **Geographic Diversity**: Models must generalize across different terrains and climates
-3. **Multi-Modal Data**: Requires processing 14 different spectral and topographic channels
-4. **Subtle Features**: Landslides can be visually similar to natural terrain variations
+- **Extreme class imbalance**: only ~1.9% of pixels are landslides
+- **Geographic domain shift**: model must generalize across unseen terrain types
+- **14-channel input**: standard pretrained encoders designed for 3-channel RGB
+- **Small positive regions**: landslides range from a few pixels to large debris flows
 
 ---
 
 ## ✨ Key Features
 
-- ✅ **Attention U-Net Architecture**: Advanced segmentation with attention mechanisms
-- ✅ **Multi-Spectral Processing**: Handles 14-channel satellite imagery
-- ✅ **Class Imbalance Handling**: Custom loss functions (Focal + Tversky)
-- ✅ **Ensemble Prediction**: Combines multiple checkpoints for robustness
-- ✅ **Comprehensive Evaluation**: Detailed metrics and visualizations
-- ✅ **Google Colab Training**: GPU-accelerated training notebook included
-- ✅ **Production-Ready Code**: Well-documented, modular architecture
-
----
-
-## 📊 Dataset
-
-### Landslide4Sense Dataset
-
-This project uses satellite imagery from the **Landslide4Sense** competition.
-
-**Dataset Statistics:**
-- **Training Set**: 3,799 images + masks
-- **Validation Set**: 245 images + masks
-- **Test Set**: 800 images + masks
-- **Image Size**: 128 × 128 pixels
-- **Channels**: 14 bands
-  - **Bands 1-12**: Sentinel-2 multispectral data
-  - **Band 13**: Slope (ALOS PALSAR)
-  - **Band 14**: Digital Elevation Model (DEM, ALOS PALSAR)
-
-**Class Distribution:**
-- Background (non-landslide): ~98.1%
-- Landslide: ~1.9%
-
-> ⚠️ **Note**: The dataset is NOT included in this repository due to size (~2.4 GB).  
-> See [data/README.md](data/README.md) for download instructions.
-
-### Data Preprocessing
-
-1. **Normalization**:
-   - Sentinel-2 bands: Percentile normalization (2nd-98th percentile)
-   - Slope & DEM: Min-max normalization
-
-2. **Augmentation** (training only):
-   - Geometric: Flips, rotations, affine transformations
-   - Noise: Gaussian noise, Gaussian blur
-   - Intensity: Brightness/contrast adjustments
-   - Deformation: Elastic transforms
-
----
-
-## 🏗️ Model Architecture
-
-### Attention U-Net
-
-The model uses an **Attention U-Net** architecture, which enhances the standard U-Net with attention gates for better feature selection.
-
-**Architecture Highlights:**
-
-```
-Input: [Batch, 14, 128, 128]  # 14-channel satellite image
-         ↓
-Encoder Path:
-  - Level 1: 64 channels  (128×128)
-  - Level 2: 128 channels (64×64)
-  - Level 3: 256 channels (32×32)
-  - Level 4: 512 channels (16×16)
-  - Bottleneck: 1024 channels (8×8)
-         ↓
-Decoder Path (with Attention Gates):
-  - Level 4: 512 channels (16×16) + Attention
-  - Level 3: 256 channels (32×32) + Attention
-  - Level 2: 128 channels (64×64) + Attention
-  - Level 1: 64 channels (128×128) + Attention
-         ↓
-Output: [Batch, 2, 128, 128]  # 2-class segmentation (background, landslide)
-```
-
-**Model Size**: 34 million parameters
-
-**Key Components:**
-- **Attention Gates**: Highlight important features from skip connections
-- **Dropout Regularization**: 30% dropout for better generalization
-- **Batch Normalization**: Stabilizes training
-
-### Loss Function
-
-**Combined Loss** = 0.4 × Focal Loss + 0.6 × Tversky Loss
-
-- **Focal Loss** (α=0.25, γ=3.0): Focuses on hard examples
-- **Tversky Loss** (α=0.2, β=0.8): Penalizes false negatives more than false positives
-
-This combination effectively handles the extreme class imbalance.
+- ✅ **UNet++ architecture** with nested dense skip connections
+- ✅ **EfficientNet-b5 encoder** with random initialization (ImageNet init tested and rejected)
+- ✅ **scSE decoder attention** — spatial + channel squeeze-excitation
+- ✅ **WeightedBCEDiceLoss** with pos_weight=12 for class imbalance
+- ✅ **Two-phase training** — Phase 1 (train only) → Phase 2 (train+valid combined)
+- ✅ **Optuna hyperparameter tuning** — best params saved and reused
+- ✅ **Automatic best checkpoint selection** — scans folder by Val F1
+- ✅ **Per-image visualizations** — 6-panel analysis for best and worst predictions
 
 ---
 
 ## 📈 Results
 
-### Performance Metrics
+### Final Model Performance
 
-| Dataset    | F1 Score | Precision | Recall | Notes                          |
-|------------|----------|-----------|--------|--------------------------------|
-| Validation | 0.6594   | 0.5490    | 0.8256 | ValidData (245 images)         |
-| **Test**   | **0.5963** | **0.5403** | **0.6652** | **TestData (800 images)** |
+**Model**: UNet++ EfficientNet-b5, Phase 2 (epoch 35)  
+**Strategy**: Single best model, no TTA, threshold=0.56  
+**Test Set**: 800 images
 
-### Model Comparison
+| Metric | Score |
+|--------|-------|
+| **F1 Score** | **0.6937** |
+| **Precision** | 0.6694 |
+| **Recall** | 0.7198 |
+| **Accuracy** | 0.9880 |
 
-| Model                    | Test F1 | Improvement | Notes                |
-|--------------------------|---------|-------------|----------------------|
-| Baseline (competition)   | 0.5780  | -           | Reference baseline   |
-| Standard U-Net           | 0.5901  | +2.1%       | Without attention    |
-| Attention U-Net (single) | 0.5746  | -0.6%       | Single best checkpoint |
-| **Attention U-Net (ensemble)** | **0.5963** | **+3.2%** | **Final model (3 checkpoints)** |
+### Comparison with Literature
 
-### Key Achievements
+| Method | Test F1 |
+|--------|---------|
+| Competition Winner (2022) | 0.7234 |
+| 2nd Place | 0.6891 |
+| **Ours (UNet++ Phase 2)** | **0.6937** |
+| 3rd Place | 0.6542 |
+| U-Net v1 baseline (ours) | 0.6227 |
 
-✅ **Honest Metrics**: Eliminated data leakage, proper train/validation/test splits  
-✅ **Improved Generalization**: Reduced overfitting gap from 14% to 9.6%  
-✅ **State-of-the-Art Architecture**: Attention mechanisms for better feature learning  
-✅ **Robust Prediction**: Ensemble of 3 checkpoints for stable results  
+Our model surpasses 3rd place and is within 0.005 of 2nd place.  
+**Improvement over our own baseline: +0.071 (+11.4%)**
 
-### Visualizations
+### Model Evolution
 
-Example predictions showing:
-- Original satellite imagery (RGB composite)
-- Ground truth landslide masks
-- Model predictions
-- Error analysis (True Positives, False Positives, False Negatives)
+| Model | Val F1 | Test F1 | Notes |
+|-------|--------|---------|-------|
+| U-Net v1 (data leakage) | 0.7103 | 0.5691 | Invalid |
+| U-Net v1 (proper splits) | 0.6688 | 0.6227 | Fixed baseline |
+| UNet++ ImageNet init | 0.6536 | — | Regression |
+| UNet++ Phase 1 | 0.7152 | 0.6241 | TrainData only |
+| **UNet++ Phase 2** | **0.7780** | **0.6937** | **Final** |
 
-![Prediction Examples](visualizations/confusion_matrix_grid.png)
+### Prediction Strategy Comparison
 
-More visualizations available in [`visualizations/`](visualizations/)
+| Strategy | Test F1 |
+|----------|---------|
+| **Single model, no TTA** | **0.6937** |
+| Single model + TTA | 0.6831 |
+| Ensemble top-3 + TTA | 0.6796 |
+
+TTA and ensemble both hurt performance — the best checkpoint was well-calibrated
+(val threshold 0.82), and averaging destabilized this.
+
+---
+
+## 📊 Dataset
+
+**Landslide4Sense** — multi-spectral satellite imagery patches.
+
+| Split | Images | Size |
+|-------|--------|------|
+| TrainData | 3,799 | ~1.9 GB |
+| ValidData | 245 | ~122 MB |
+| TestData | 800 | ~400 MB |
+
+- **Image format**: HDF5 (`.h5`), 128 × 128 × 14, float32
+- **Mask format**: HDF5 (`.h5`), 128 × 128, binary (0=background, 1=landslide)
+- **Bands**: 12 Sentinel-2 multispectral + slope + DEM (ALOS PALSAR)
+- **Class distribution**: 1.9% landslide, 98.1% background
+
+> ⚠️ Dataset not included (~2.4 GB). See [data/README.md](data/README.md) for download.
+
+---
+
+## 🏗️ Model Architecture
+
+### UNet++ with EfficientNet-b5
+```
+Input:   [Batch, 14, 128, 128]
+Encoder: EfficientNet-b5 (random init — ImageNet init reduced F1 from 0.73 → 0.65)
+Decoder: UNet++ nested dense blocks + scSE attention at each level
+Output:  [Batch, 1, 128, 128] → sigmoid → binary mask
+```
+
+**Why UNet++?** Nested dense skip connections progressively fuse encoder features
+at multiple scales, reducing the semantic gap between encoder and decoder.
+Better than standard U-Net for small irregular objects like landslides.
+
+**Why random init?** EfficientNet expects 3-channel RGB. The 3→14 channel adapter
+is always random regardless of pretrained weights — this destabilizes the encoder
+when weights are frozen or slowed down. Full random init was more stable and achieved
+higher F1.
+
+### Loss Function
+```
+Loss = 0.3 × BCE(pos_weight=12) + 0.7 × DiceLoss
+```
+
+`pos_weight=12` forces the model to count each landslide pixel 12× more than background,
+directly addressing the 1.9% class imbalance and pushing toward higher recall.
+
+Focal Loss was tested and caused training collapse (F1 → 0.05). Not used.
+
+### Training Strategy
+
+**Phase 1** — TrainData only (3,799 images), patience=15, up to 60 epochs.
+Validates on official ValidData. Goal: find best training duration.
+
+**Phase 2** — Train+Valid combined (4,044 images), fixed 35 epochs, no early stopping.
+ValidData included with training augmentations. Top-3 checkpoints saved by Val F1.
 
 ---
 
@@ -183,277 +176,183 @@ More visualizations available in [`visualizations/`](visualizations/)
 
 ### Prerequisites
 
-- Python 3.12 (recommended) or 3.11+
-- NVIDIA GPU with CUDA 11.8 (optional, for training)
-- 16 GB RAM minimum (8 GB for inference only)
+- Python 3.10+
+- NVIDIA GPU with CUDA (recommended) — CPU works for inference
+- 8 GB RAM minimum
 
-### Setup Instructions
-
-#### 1. Clone the Repository
-
+### Setup
 ```bash
 git clone https://github.com/Oghuz20/Landslide-Detection-Satellite-AI.git
 cd Landslide-Detection-Satellite-AI
-```
+git checkout v2-unetplusplus-kaggle
 
-#### 2. Create Virtual Environment
-
-**Windows (PowerShell):**
-```powershell
+# Windows
 python -m venv venv_landslide
 .\venv_landslide\Scripts\Activate.ps1
-```
 
-**Linux/Mac:**
-```bash
+# Linux / Mac
 python3 -m venv venv_landslide
 source venv_landslide/bin/activate
-```
 
-#### 3. Install Dependencies
-
-**Windows:**
-```powershell
-pip install -r requirements.txt --break-system-packages
-```
-
-**Linux/Mac:**
-```bash
 pip install -r requirements.txt
 ```
 
-#### 4. Download Dataset
-
-See [data/README.md](data/README.md) for dataset download instructions.
-
-Place the downloaded data in the `data/` folder:
-```
-data/
-├── TrainData/
-├── ValidData/
-└── TestData/
-```
-
-#### 5. Verify Installation
-
+### Verify
 ```bash
-python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA Available: {torch.cuda.is_available()}')"
+python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
 ```
 
 ---
 
 ## 💻 Usage
 
-### Quick Start: Inference
-
-Run predictions on test data using the ensemble model:
-
+### Predict
 ```bash
-python ensemble_predict.py
+python src/predict.py
 ```
 
-**Output**: Predictions saved to `predictions/test_final/`
+Auto-selects best checkpoint by Val F1, runs prediction on TestData,
+saves masks to `predictions/`, prints final metrics.
 
-### Training (Google Colab)
-
-The model was trained on Google Colab with free T4 GPU:
-
-1. Open [`notebooks/train_colab.ipynb`](notebooks/train_colab.ipynb) in Google Colab
-2. Upload your dataset or mount Google Drive
-3. Run all cells
-4. Download trained checkpoints
-
-**Training Configuration:**
-- **Optimizer**: AdamW (lr=1e-4, weight_decay=2e-4)
-- **Batch Size**: 16
-- **Epochs**: 40 (early stopping at epoch 37)
-- **Best Checkpoint**: Epoch 25 (Validation F1: 0.6594)
-
-### Evaluation
-
-Evaluate model performance on test set:
-
+To use a specific checkpoint:
 ```bash
-python src/evaluate.py
+python src/predict.py --checkpoint checkpoints/checkpoint_epoch_35.pth
 ```
 
-**Output**: Metrics printed to console and saved to `evaluation_results.txt`
-
-### Visualization
-
-Generate comprehensive visualizations:
-
+### Visualize
 ```bash
 python src/visualize.py
 ```
 
-**Output**: Visualizations saved to `visualizations/`:
-- Performance distribution plots
-- Confusion matrix examples
-- Best/worst case predictions
-- Random sample predictions
+Saves all PNGs to `visualizations/`:
+- `threshold_curve.png` — F1/P/R vs threshold
+- `confusion_matrix.png` — TN/FP/FN/TP heatmap
+- `performance_distribution.png` — per-image F1 histogram
+- `best_1..5_*.png` — top 5 predictions (6-panel each)
+- `worst_1..5_*.png` — bottom 5 predictions, landslide images only
+- `results_summary.png` — strategy comparison bar chart
+- `training_curves.png` — loss, val F1, LR over epochs
 
-### Example Code
+### Train
+```bash
+python src/train.py
+```
 
+Runs Phase 1 then Phase 2 sequentially.
+See `notebook/landslide_v2_kaggle.ipynb` for the full Kaggle notebook.
+
+### Quick inference example
 ```python
-from src.dataset import LandslideDataset, get_valid_transforms
-from src.model import create_model
 import torch
+from src.model import get_model
+from src.dataset import LandslideDataset
+from src.transforms import get_valid_transforms
 
-# Load model
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = create_model('attention_unet', n_channels=14, n_classes=2)
-model.load_state_dict(torch.load('checkpoints/best_model.pth', map_location=device))
-model.to(device)
+model  = get_model().to(device)
+ckpt   = torch.load('checkpoints/checkpoint_epoch_35.pth', map_location=device)
+model.load_state_dict(ckpt['model_state_dict'])
 model.eval()
 
-# Load data
-dataset = LandslideDataset(
-    data_dir='./data',
-    split='test',
-    transform=get_valid_transforms()
-)
-
-# Make prediction
-sample = dataset[0]
-image = sample['image'].unsqueeze(0).to(device)
+dataset = LandslideDataset('./data', split='test', transform=get_valid_transforms())
+sample  = dataset[0]
+image   = sample['image'].unsqueeze(0).to(device)
 
 with torch.no_grad():
-    output = model(image)
-    prediction = torch.argmax(output, dim=1).cpu().numpy()
+    prob = torch.sigmoid(model(image)[0, 0]).cpu().numpy()
+    pred = (prob >= 0.56).astype(int)
 
-print(f"Prediction shape: {prediction.shape}")
+print(f'Landslide pixels: {pred.sum()} / {pred.size}')
 ```
 
 ---
 
 ## 📁 Project Structure
-
 ```
 Landslide-Detection-Satellite-AI/
+├── data/
+│   └── README.md                  ← dataset download instructions
 │
-├── 📁 data/                     # Dataset (not in Git)
-│   ├── TrainData/               # 3,799 training images + masks
-│   ├── ValidData/               # 245 validation images + masks
-│   ├── TestData/                # 800 test images + masks
-│   └── README.md                # Download instructions
+├── src/
+│   ├── dataset.py                 ← LandslideDataset, HDF5 loader, normalization
+│   ├── model.py                   ← get_model() — UNet++ EfficientNet-b5
+│   ├── losses.py                  ← WeightedBCEDiceLoss
+│   ├── transforms.py              ← train / valid augmentation pipelines
+│   ├── train.py                   ← train_phase1(), train_phase2()
+│   ├── predict.py                 ← best checkpoint selection, threshold search
+│   └── visualize.py               ← all PNG generation
 │
-├── 📁 src/                      # Source code
-│   ├── __init__.py              # Package initialization
-│   ├── dataset.py               # Data loading and preprocessing
-│   ├── model.py                 # Attention U-Net architecture
-│   ├── evaluate.py              # Evaluation metrics
-│   └── visualize.py             # Visualization functions
+├── configs/
+│   └── optuna_best_params.json    ← best hyperparameters from Optuna study
 │
-├── 📁 checkpoints/              # Trained models
-│   ├── best_model.pth           # Best model (Epoch 25, F1=0.6594)
-│   ├── epoch_30.pth             # Checkpoint for ensemble
-│   ├── epoch_35.pth             # Checkpoint for ensemble
-│   └── training_history.png     # Training curves
+├── notebook/
+│   └── landslide_v2_kaggle.ipynb  ← full Kaggle training notebook
 │
-├── 📁 predictions/              # Model outputs
-│   └── test_final/              # Test set predictions (800 masks)
+├── checkpoints/                   ← .pth files (not tracked by git)
+├── predictions/                   ← output HDF5 masks (not tracked by git)
+├── visualizations/                ← output PNGs (not tracked by git)
 │
-├── 📁 visualizations/           # Result visualizations
-│   ├── performance_distribution.png
-│   ├── confusion_matrix_grid.png
-│   └── prediction_*.png         # Individual predictions
+├── docs/
+│   ├── RESULTS.md                 ← detailed results and comparisons
+│   ├── METHODOLOGY.md             ← architecture and training decisions
+│   └── USAGE.md                   ← full usage guide
 │
-├── 📁 docs/                     # Documentation
-│   ├── RESULTS.md               # Detailed results analysis
-│   ├── METHODOLOGY.md           # Training methodology
-│   ├── USAGE.md                 # Usage examples
-│   └── final_results.txt        # Raw metrics
-│
-├── 📁 notebooks/                # Jupyter notebooks
-│   └── train_colab.ipynb        # Google Colab training notebook
-│
-├── 📁 scripts/                  # Utility scripts
-│   ├── cleanup_old_files.ps1    # Remove old files
-│   └── reorganize_structure.ps1 # Restructure project
-│
-├── ensemble_predict.py          # Main inference script
-├── requirements.txt             # Python dependencies
-├── .gitignore                   # Git ignore rules
-├── LICENSE                      # MIT License
-└── README.md                    # This file
+├── .gitignore
+├── LICENSE
+├── requirements.txt
+└── README.md
 ```
 
 ---
 
 ## 📚 Documentation
 
-Detailed documentation available in the [`docs/`](docs/) folder:
-
-- **[RESULTS.md](docs/RESULTS.md)**: Comprehensive results analysis
-  - Confusion matrices
-  - Performance comparisons
-  - Error analysis
-  - Geographic distribution of errors
-
-- **[METHODOLOGY.md](docs/METHODOLOGY.md)**: Training methodology
-  - Data preparation
-  - Model architecture details
-  - Loss function design
-  - Hyperparameter tuning
-
-- **[USAGE.md](docs/USAGE.md)**: Detailed usage examples
-  - Custom dataset preparation
-  - Advanced training options
-  - Visualization customization
-  - Deployment guidelines
+- **[RESULTS.md](docs/RESULTS.md)** — full metrics, confusion matrix, error analysis, literature comparison
+- **[METHODOLOGY.md](docs/METHODOLOGY.md)** — architecture decisions, loss function design, training strategy
+- **[USAGE.md](docs/USAGE.md)** — installation, inference, training, troubleshooting
 
 ---
 
 ## 🎓 Academic Context
 
-This project was developed as a **graduation thesis** on automated landslide detection using deep learning. The work demonstrates:
+Developed as a **graduation thesis** on automated landslide detection using deep learning.
 
-1. **Problem Definition**: Addressing the challenge of landslide detection at scale
-2. **Literature Review**: State-of-the-art semantic segmentation techniques
-3. **Methodology**: Attention U-Net with specialized loss functions
-4. **Experimentation**: Systematic evaluation of different architectures and techniques
-5. **Results Analysis**: Honest reporting of performance and limitations
-6. **Practical Application**: Production-ready code for real-world deployment
+**Contributions**:
+- Demonstrated that ImageNet pretraining hurts performance on 14-channel satellite data
+- Showed that single well-calibrated model outperforms TTA and ensemble on this dataset
+- Two-phase training strategy that maximizes use of labeled data without leakage
+- Achieved Test F1=0.6937, surpassing 3rd place in the original 2022 competition
 
-### Limitations & Future Work
+**Limitations**:
+- Val→Test gap of 0.084 due to geographic domain shift between official splits
+- Small validation set (245 images) limits hyperparameter search reliability
+- Performance drops on small landslides (<20 pixels) and heavily vegetated areas
 
-**Current Limitations:**
-- Geographic domain shift between validation and test sets (9.6% performance gap)
-- Small validation set (245 images) limits hyperparameter optimization
-- Extreme class imbalance remains challenging
-
-**Future Improvements:**
-- Collect more diverse validation data from test regions
-- Explore transformer-based architectures (SegFormer, Mask2Former)
-- Implement semi-supervised learning with unlabeled data
-- Multi-task learning (landslide + landslide type classification)
-- Real-time deployment on satellite data streams
+**Future work**:
+- Transformer-based architectures (SegFormer, Mask2Former)
+- Semi-supervised learning with unlabeled satellite imagery
+- Domain adaptation to close the geographic generalization gap
 
 ---
 
 ## 📖 Citation
-
-If you use this code or model in your research, please cite:
-
 ```bibtex
-@software{landslide_detection_2026,
-  author = {[Your Name]},
-  title = {Landslide Detection from Satellite Imagery using Attention U-Net},
-  year = {2026},
-  url = {https://github.com/Oghuz20/Landslide-Detection-Satellite-AI}
+@software{hasanli2026landslide,
+  author = {Hasanli, Oghuz},
+  title  = {Landslide Detection from Satellite Imagery using UNet++ EfficientNet-b5},
+  year   = {2026},
+  url    = {https://github.com/Oghuz20/Landslide-Detection-Satellite-AI}
 }
 ```
 
-**Dataset Citation:**
-
+**Dataset:**
 ```bibtex
 @article{ghorbanzadeh2022landslide4sense,
-  title={The outcome of the 2022 landslide4sense competition: Advanced landslide detection from multisource satellite imagery},
-  author={Ghorbanzadeh, Omid and Xu, Yonghao and Ghamisi, Pedram and Kopp, Martin and Kreil, David},
-  journal={IEEE Journal of Selected Topics in Applied Earth Observations and Remote Sensing},
-  year={2022},
-  publisher={IEEE}
+  title   = {The outcome of the 2022 landslide4sense competition},
+  author  = {Ghorbanzadeh, Omid and Xu, Yonghao and Ghamisi, Pedram and Kopp, Martin and Kreil, David},
+  journal = {IEEE Journal of Selected Topics in Applied Earth Observations and Remote Sensing},
+  year    = {2022},
+  publisher = {IEEE}
 }
 ```
 
@@ -461,35 +360,13 @@ If you use this code or model in your research, please cite:
 
 ## 📄 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
 ## 🙏 Acknowledgments
 
-- **Landslide4Sense Competition** for providing the dataset
-- **Google Colab** for free GPU resources
-- **PyTorch** and **Albumentations** communities for excellent libraries
-- Thesis advisor and committee for guidance
-
----
-
-## 📬 Contact
-
-For questions, issues, or collaborations:
-
-- **GitHub Issues**: [Open an issue](https://github.com/Oghuz20/Landslide-Detection-Satellite-AI/issues)
-- **Email**: [your.email@example.com]
-- **LinkedIn**: [Your LinkedIn Profile]
-
----
-
-## ⭐ Star History
-
-If you find this project helpful, please consider giving it a ⭐!
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Oghuz20/Landslide-Detection-Satellite-AI&type=Date)](https://star-history.com/#Oghuz20/Landslide-Detection-Satellite-AI&Date)
-
----
-
-**Made with ❤️ for landslide detection research**
+- **Landslide4Sense** for the benchmark dataset
+- **Kaggle** for P100 GPU resources
+- **segmentation-models-pytorch** for the UNet++ implementation
+- **Albumentations** for the augmentation pipeline
