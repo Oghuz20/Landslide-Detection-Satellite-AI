@@ -369,4 +369,5 @@ MIT License — see [LICENSE](LICENSE) for details.
 - **Landslide4Sense** for the benchmark dataset
 - **Kaggle** for P100 GPU resources
 - **segmentation-models-pytorch** for the UNet++ implementation
-- **Albumentations** for the augmentation pipeline
+- **Albumentations** for the augmentation pipeline 
+ 
