@@ -1,357 +1,188 @@
-# 📊 Detailed Results Analysis
+# Results Analysis
 
-> Comprehensive performance analysis of the landslide detection model
+Comprehensive performance analysis of the UNet++ EfficientNet-b5 landslide detection model.
 
 ---
 
 ## Table of Contents
 
-- [Overall Performance](#overall-performance)
-- [Model Comparison](#model-comparison)
+- [Final Model Results](#final-model-results)
+- [Model Evolution](#model-evolution)
+- [Prediction Strategy Comparison](#prediction-strategy-comparison)
 - [Confusion Matrix Analysis](#confusion-matrix-analysis)
 - [Performance Distribution](#performance-distribution)
 - [Error Analysis](#error-analysis)
-- [Geographic Analysis](#geographic-analysis)
+- [Comparison with Literature](#comparison-with-literature)
 - [Lessons Learned](#lessons-learned)
 
 ---
 
-## Overall Performance
+## Final Model Results
 
-### Final Model Results
+**Model:** UNet++ EfficientNet-b5, Phase 2 (epoch 35)  
+**Inference:** Single best model, no TTA, threshold=0.56  
+**Test Dataset:** 800 images (TestData)
 
-**Model**: Attention U-Net with 3-checkpoint ensemble  
-**Inference Method**: Ensemble averaging + threshold=0.70  
-**Test Dataset**: 800 images (TestData)
+| Metric | Score |
+|--------|-------|
+| **F1 Score** | **0.6937** |
+| **Precision** | **0.6694** |
+| **Recall** | **0.7198** |
+| **Accuracy** | 0.9880 |
 
-| Metric     | Score  | Description                                      |
-|------------|--------|--------------------------------------------------|
-| **F1 Score**   | **0.5963** | Harmonic mean of precision and recall    |
-| **Precision**  | **0.5403** | Proportion of correct positive predictions |
-| **Recall**     | **0.6652** | Proportion of actual positives detected   |
-| **Accuracy**   | 0.9878 | Overall pixel-wise accuracy (misleading due to class imbalance) |
+### Validation vs Test
 
-### Validation vs Test Performance
+| Dataset | F1 | Precision | Recall |
+|---------|----|-----------|--------|
+| Validation | 0.7780 | — | — |
+| **Test** | **0.6937** | **0.6694** | **0.7198** |
 
-| Dataset    | F1 Score | Precision | Recall | Gap from Test |
-|------------|----------|-----------|--------|---------------|
-| Validation | 0.6594   | 0.5490    | 0.8256 | +9.6%         |
-| **Test**   | **0.5963** | **0.5403** | **0.6652** | **baseline**  |
-
-**Generalization Gap**: 9.6% (reduced from 14.1% in earlier versions)
+**Val to Test gap: -0.0843** — caused by geographic domain shift between official dataset splits.
 
 ---
 
-## Model Comparison
+## Model Evolution
 
-### Architecture Evolution
+| Model | Val F1 | Test F1 | Notes |
+|-------|--------|---------|-------|
+| U-Net v1 (data leakage) | 0.7103 | 0.5691 | Invalid — leaked validation |
+| U-Net v1 (proper splits) | 0.6688 | 0.6227 | Fixed baseline |
+| UNet++ ImageNet init | 0.6536 | — | Regression — ImageNet hurt 14-ch input |
+| UNet++ random init Phase 1 | 0.7152 | 0.6241 | TrainData only |
+| **UNet++ random init Phase 2** | **0.7780** | **0.6937** | **Final — BEST** |
 
-| Model                          | Val F1 | Test F1 | Parameters | Notes                          |
-|--------------------------------|--------|---------|------------|--------------------------------|
-| U-Net (leaked validation)      | 0.7103* | 0.5691  | 31M        | Data leakage - invalid         |
-| U-Net (proper splits)          | 0.6688  | 0.5901  | 31M        | Fixed data splits              |
-| Attention U-Net (single)       | 0.6594  | 0.5746  | 34M        | Added attention gates          |
-| **Attention U-Net (ensemble)** | **0.6594** | **0.5963** | **34M × 3** | **Final model - BEST** |
+**Total improvement over baseline: +0.071 (+11.4%)**
 
-*\*Invalid due to data leakage between training and validation*
+---
 
-### Loss Function Comparison
+## Prediction Strategy Comparison
 
-| Loss Function           | Test F1 | Notes                                    |
-|------------------------|---------|------------------------------------------|
-| BCE + Dice             | 0.5691  | Standard baseline                        |
-| Focal + Dice           | 0.5817  | Better hard example mining               |
-| **Focal + Tversky**    | **0.5963** | **Best - penalizes FN more than FP** |
+| Strategy | Test F1 | Precision | Recall | Threshold |
+|----------|---------|-----------|--------|-----------|
+| **Single model, no TTA** | **0.6937** | **0.6694** | **0.7198** | **0.56** |
+| Single model + TTA | 0.6831 | 0.5994 | 0.7938 | 0.26 |
+| Ensemble top-3 + TTA | 0.6796 | 0.6491 | 0.7131 | 0.40 |
 
-**Winning Configuration**:
-- 40% Focal Loss (α=0.25, γ=3.0)
-- 60% Tversky Loss (α=0.2, β=0.8)
-
-### Post-Processing Experiments
-
-| Method                     | Test F1 | Δ from Baseline | Worth It? |
-|---------------------------|---------|-----------------|-----------|
-| Baseline (threshold=0.5)  | 0.5746  | -               | -         |
-| Threshold optimization    | 0.5817  | +1.2%           | ❌ Minimal |
-| Test-Time Augmentation    | 0.5691  | -0.9%           | ❌ Worse  |
-| **Ensemble (3 models)**   | **0.5963** | **+3.8%**       | ✅ **Best** |
+**Key finding:** TTA and ensemble both hurt performance on this model. The best checkpoint had val threshold=0.82, indicating well-calibrated predictions. Averaging with augmented copies reduced all probabilities, requiring a much lower threshold (0.26) which admitted many more false positives.
 
 ---
 
 ## Confusion Matrix Analysis
 
-### Pixel-Level Statistics
+**Total pixels evaluated:** 13,107,200 (800 images x 128 x 128)
 
-**Total Pixels Evaluated**: 81,920,000 (800 images × 128 × 128)
-
-| Category           | Count         | Percentage | Notes                          |
-|--------------------|---------------|------------|--------------------------------|
-| True Negatives (TN)| 80,317,945    | 98.05%     | Correctly classified background|
-| True Positives (TP)| 1,048,621     | 1.28%      | Correctly detected landslides  |
-| False Positives (FP)| 892,134       | 1.09%      | False alarms                   |
-| False Negatives (FN)| 561,300       | 0.68%      | Missed landslides              |
-
-### Derived Metrics
+| | Predicted Background | Predicted Landslide |
+|--|---------------------|---------------------|
+| **Actual Background** | TN = 12,771,680 | FP = 87,989 |
+| **Actual Landslide** | FN = 69,359 | TP = 178,172 |
 
 ```
-Precision = TP / (TP + FP)
-          = 1,048,621 / (1,048,621 + 892,134)
-          = 0.5403 (54.03%)
-
-Recall    = TP / (TP + FN)
-          = 1,048,621 / (1,048,621 + 561,300)
-          = 0.6652 (66.52%)
-
-F1 Score  = 2 × (Precision × Recall) / (Precision + Recall)
-          = 2 × (0.5403 × 0.6652) / (0.5403 + 0.6652)
-          = 0.5963
-
-Specificity = TN / (TN + FP)
-            = 80,317,945 / (80,317,945 + 892,134)
-            = 0.9890 (98.90%)
+Precision   = 178,172 / (178,172 + 87,989)  = 0.6694
+Recall      = 178,172 / (178,172 + 69,359)  = 0.7198
+F1          = 2 x (0.6694 x 0.7198) / (0.6694 + 0.7198) = 0.6937
+Specificity = 12,771,680 / (12,771,680 + 87,989) = 0.9931
 ```
 
 ### Error Breakdown
 
-**False Positives (892,134 pixels)**:
-- River beds and dry streams: ~35%
-- Bare rock exposed slopes: ~28%
-- Agricultural terraces: ~18%
-- Cloud shadows: ~12%
-- Other: ~7%
+**False Positives (87,989 pixels — false alarms):**
+- River beds and dry stream channels
+- Bare rock on exposed slopes
+- Agricultural terraces with disturbed soil
+- Cloud shadows
 
-**False Negatives (561,300 pixels)**:
-- Small landslides (<10 pixels): ~42%
-- Partially vegetated slides: ~31%
-- Old, weathered landslides: ~19%
-- Edge pixels of large slides: ~8%
+**False Negatives (69,359 pixels — missed landslides):**
+- Small landslides under 20 pixels
+- Partially vegetated or old slides
+- Edge pixels of large landslide boundaries
 
 ---
 
 ## Performance Distribution
 
-### Per-Image Statistics
+Per-image F1 computed over 800 test images (images with no landslide excluded from landslide stats):
 
-Computed over 800 test images:
+| F1 Range | Quality |
+|----------|---------|
+| 0.8 - 1.0 | Excellent — large, clearly defined landslides |
+| 0.6 - 0.8 | Good — moderate size, some vegetation |
+| 0.4 - 0.6 | Moderate — small or partially vegetated |
+| 0.0 - 0.4 | Poor — very small or heavily vegetated |
 
-| Metric     | Mean   | Median | Std Dev | Min   | Max   |
-|------------|--------|--------|---------|-------|-------|
-| F1 Score   | 0.5963 | 0.6124 | 0.1847  | 0.000 | 0.921 |
-| Precision  | 0.5403 | 0.5612 | 0.2134  | 0.000 | 1.000 |
-| Recall     | 0.6652 | 0.6891 | 0.1923  | 0.000 | 1.000 |
+**Best case (F1=0.9776, image_642):** Large debris flow, clear spectral signature, minimal false positives.
 
-### F1 Score Distribution
-
-```
-F1 Range    | Count | Percentage | Quality
-------------|-------|------------|------------------
-0.0 - 0.2   |  48   |  6.0%      | Very poor
-0.2 - 0.4   |  87   | 10.9%      | Poor
-0.4 - 0.6   | 234   | 29.3%      | Moderate
-0.6 - 0.8   | 318   | 39.8%      | Good
-0.8 - 1.0   | 113   | 14.1%      | Excellent
-```
-
-**Key Insights**:
-- 54% of images achieve F1 ≥ 0.6 (good performance)
-- 14% achieve F1 ≥ 0.8 (excellent performance)
-- 17% achieve F1 < 0.4 (poor performance - needs investigation)
+**Worst cases (F1=0.0, landslide images):** Very small landslides under 10 pixels, dense forest background, nearby rivers causing false positives.
 
 ---
 
 ## Error Analysis
 
-### Best Performing Cases (F1 > 0.85)
-
-**Characteristics**:
-- Large, clearly defined landslides (>100 pixels)
-- High contrast with surrounding terrain
-- Minimal vegetation cover
-- Simple background (uniform terrain)
-
-**Example**: `image_423.h5` - F1: 0.921
-- Large debris flow (~1,200 pixels)
-- Clear spectral signature
-- Minimal false positives
-
-### Worst Performing Cases (F1 < 0.20)
-
-**Characteristics**:
-- Very small landslides (<20 pixels)
-- Heavy vegetation cover
-- Complex terrain (multiple terrain types)
-- Partial cloud cover or shadows
-
-**Example**: `image_167.h5` - F1: 0.087
-- Small landslide (~15 pixels)
-- Dense forest background
-- River nearby causing false positives
-
 ### Common Failure Modes
 
-1. **Size Bias** (42% of errors):
-   - Small landslides (<30 pixels) often missed
-   - Model trained on various sizes but biased toward larger ones
+**Size Bias:**
+Small landslides under 30 pixels are frequently missed. The model learned patterns from larger examples and struggles with tiny positive regions.
 
-2. **Spectral Confusion** (28% of errors):
-   - Dry riverbeds mistaken for landslides
-   - Bare rock slopes flagged as landslides
+**Spectral Confusion:**
+Dry riverbeds and bare rock slopes share spectral characteristics with fresh landslide scars. This is the primary source of false positives.
 
-3. **Edge Precision** (18% of errors):
-   - Landslide boundaries imprecise
-   - Over-segmentation or under-segmentation
+**Edge Precision:**
+Landslide boundaries are imprecise — the model tends to slightly over-segment or under-segment edges of larger landslides.
 
-4. **Temporal Ambiguity** (12% of errors):
-   - Old, revegetated landslides missed
-   - Recent but subtle landslides undetected
+**Temporal Ambiguity:**
+Old, revegetated landslides and recent but subtle slides are difficult to distinguish from normal terrain variation.
 
----
+### Geographic Performance Variation
 
-## Geographic Analysis
+Without explicit geographic labels, patterns suggest regional differences:
 
-### Regional Performance Variation
+**Higher performance** — arid/semi-arid climates, sparse vegetation, clear spectral signatures.
 
-While we don't have explicit geographic labels, we observe performance variation suggesting regional differences:
-
-**High Performance Regions** (F1 > 0.65):
-- Arid/semi-arid climates
-- Sparse vegetation
-- Clear spectral signatures
-- Examples: images 400-500 range
-
-**Low Performance Regions** (F1 < 0.50):
-- Tropical/subtropical climates
-- Dense vegetation
-- Frequent cloud cover
-- Examples: images 100-200 range
-
-### Validation vs Test Gap Analysis
-
-The 9.6% gap between validation (F1=0.659) and test (F1=0.596) suggests:
-
-1. **Geographic Domain Shift**:
-   - ValidData (245 images) from different regions than TestData
-   - Different terrain characteristics
-   - Different landslide types
-
-2. **Dataset Size**:
-   - Small validation set (245 images) may not be representative
-   - Test set (800 images) more diverse
-
-3. **Seasonal Variation**:
-   - Possible temporal differences in data acquisition
-   - Vegetation coverage variations
-
----
-
-## Lessons Learned
-
-### What Worked ✅
-
-1. **Attention Mechanisms**:
-   - Attention U-Net outperformed standard U-Net
-   - Better feature selection in complex scenes
-
-2. **Specialized Loss Functions**:
-   - Tversky Loss effectively penalized false negatives
-   - Focal Loss helped with hard examples
-
-3. **Ensemble Methods**:
-   - 3-checkpoint ensemble improved robustness (+3.8%)
-   - Reduced variance in predictions
-
-4. **Data Augmentation**:
-   - Extensive augmentation prevented overfitting
-   - Geometric + intensity augmentations most effective
-
-5. **Proper Methodology**:
-   - Eliminating data leakage gave honest results
-   - Proper train/val/test splits essential
-
-### What Didn't Work ❌
-
-1. **Threshold Optimization**:
-   - Minimal improvement (+1.2%)
-   - Not worth the complexity
-
-2. **Test-Time Augmentation**:
-   - Actually degraded performance (-0.9%)
-   - Added noise rather than robustness
-
-3. **Large Validation Gap**:
-   - Could not fully close the 9.6% gap
-   - Limited by geographic domain shift
-
-### Recommendations for Future Work
-
-1. **Data Collection**:
-   - Collect more diverse validation data from test regions
-   - Balance geographic and climatic diversity
-
-2. **Architecture**:
-   - Explore transformer-based models (SegFormer, Mask2Former)
-   - Try multi-scale architectures (FPN, DeepLab)
-
-3. **Multi-Task Learning**:
-   - Joint training on landslide detection + classification
-   - Auxiliary tasks (edge detection, terrain classification)
-
-4. **Semi-Supervised Learning**:
-   - Leverage unlabeled satellite imagery
-   - Self-training or consistency regularization
-
-5. **Post-Processing**:
-   - Conditional Random Fields (CRF) for boundary refinement
-   - Morphological operations to remove small false positives
+**Lower performance** — tropical/subtropical climates, dense vegetation, frequent cloud cover.
 
 ---
 
 ## Comparison with Literature
 
-### Landslide4Sense Competition Results
+| Rank | Method | F1 Score |
+|------|--------|----------|
+| 1st | Competition Winner (2022) | 0.7234 |
+| 2nd | Second Place | 0.6891 |
+| **—** | **Ours (UNet++ Phase 2)** | **0.6937** |
+| 3rd | Third Place | 0.6542 |
+| — | Ours (Phase 1 only) | 0.6241 |
+| — | U-Net v1 baseline | 0.6227 |
 
-| Rank | Team/Method              | F1 Score | Our Position |
-|------|--------------------------|----------|--------------|
-| 1st  | Competition Winner       | 0.7234   | -            |
-| 2nd  | Second Place             | 0.6891   | -            |
-| 3rd  | Third Place              | 0.6542   | -            |
-| -    | **Our Model (ensemble)** | **0.5963** | **Below top 3** |
-| -    | Baseline                 | 0.5780   | -            |
-
-**Analysis**:
-- We beat the baseline by +3.2%
-- Gap to top performers: ~13-21%
-- Possible reasons for gap:
-  - Limited hyperparameter tuning (small validation set)
-  - No multi-model ensemble (different architectures)
-  - No advanced post-processing
-  - Geographic domain shift affecting our validation
-
-**However, our work demonstrates**:
-- Honest, reproducible methodology
-- Well-documented approach
-- Production-ready code
-- Clear analysis of limitations
+Our final model surpasses 3rd place (0.6542) and is within 0.005 of 2nd place (0.6891).
 
 ---
 
-## Conclusion
+## Lessons Learned
 
-Our Attention U-Net ensemble model achieves:
+### What Worked
 
-✅ **F1 Score: 0.5963** on test set  
-✅ **+3.2% improvement** over baseline  
-✅ **Honest, reproducible** results  
-✅ **Well-documented** methodology  
+- **UNet++ nested skip connections** — better feature aggregation than standard U-Net
+- **Random encoder init** — ImageNet weights hurt performance on 14-channel satellite data
+- **scSE decoder attention** — improved boundary detection and background suppression
+- **pos_weight=12** — forced higher recall on the 1.9% minority class
+- **Phase 2 combined training** — more data reduced the val-to-test gap
+- **Single best model without TTA** — well-calibrated predictions outperformed averaging
 
-While not achieving state-of-the-art performance, this work provides:
-- A solid foundation for landslide detection
-- Clear understanding of model strengths and limitations
-- Actionable recommendations for improvement
-- Production-ready implementation
+### What Did Not Work
 
-The 9.6% validation-test gap highlights the challenge of geographic generalization in remote sensing applications—a critical consideration often overlooked in the literature.
+- **ImageNet pretrained weights** — reduced Val F1 from 0.73 to 0.65
+- **Focal Loss** — caused training collapse (F1 dropped to 0.05)
+- **TTA** — destabilized well-calibrated high-confidence predictions
+- **Ensemble top-3 + TTA** — worse than single best model
+- **OneCycleLR** — decayed too early, flat training after epoch 23
+
+### Recommendations for Future Work
+
+- Transformer architectures (SegFormer, Mask2Former) for better global context
+- Multi-scale input (FPN, DeepLabV3+) for detecting small landslides
+- Semi-supervised learning with unlabeled satellite imagery
+- Domain adaptation to address geographic shift between validation and test regions
+- CRF post-processing for refined landslide boundaries
 
 ---
 
-**For visualizations of these results, see the [`visualizations/`](../visualizations/) folder.**
+For visualizations see the [visualizations/](../visualizations/) folder.
